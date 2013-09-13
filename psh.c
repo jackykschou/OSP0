@@ -14,8 +14,8 @@
 #include <errno.h>
 #include "util.h"
 
-#define MAX_COMMAND_ARG_NUM 20
-#define MAX_COMMAND_ARC_WORD_SIZE 20
+#define MAX_COMMAND_ARG_NUM 30
+#define MAX_COMMAND_ARC_WORD_SIZE 50
 
 /* Global variables */
 int verbose = 0;            /* if true, print additional output */
@@ -98,45 +98,36 @@ int main(int argc, char **argv)
 /* 
  * eval - Evaluate the command line that the user has just typed in
  * 
- * If the user has requested a built-in command (quit)
+ * If the user has requested a built-in command (quit) 
  * then execute it immediately. Otherwise, fork a child process and
  * run the job in the context of the child. If the job is running in
  * the foreground, wait for it to terminate and then return. 
 */
 void eval(char *cmdline) 
 {
-    char **command = malloc((sizeof(char*) * MAX_COMMAND_ARG_NUM));
-    int i;
-    for(i = 0; i < MAX_COMMAND_ARG_NUM; ++i)
+    if(strcmp(cmdline, "\n") != 0)
     {
-        command[i] = malloc(sizeof(char) * MAX_COMMAND_ARC_WORD_SIZE);
-    }
-    parseline(cmdline, command);
-    if(strcmp(command[0], "quit") == 0)
-        exit(0);
-    else
-    {
-        int status;
-        pid_t child = fork();
-        if(child == 0)
+        const int STDOUT = 1;
+        char command[MAX_COMMAND_ARG_NUM][MAX_COMMAND_ARC_WORD_SIZE];
+        char **command_ptr = command;
+        parseline(cmdline, command);
+
+        /*execute the program if it is not a build-in command*/
+        if(!builtin_cmd(command))
         {
-            execve(command[0], command, environ);
-        }
-        else
-        {
-            while(1)
+            int status;
+            pid_t child = fork();
+            if(child == 0)
             {
-              int pid = wait(&status);
-              if(pid == -1)
-              {
-                  break;
-              }
+                execvp(command_ptr[0], command_ptr);
+                strcat (command_ptr[0],": command not found\n");
+                write(STDOUT, command_ptr[0], 20 + sizeof(command_ptr[0]));
+                exit(1);
             }
-            for(i = 0; i < MAX_COMMAND_ARG_NUM; ++i)
+            else
             {
-                free(command[i]);
+                wait(&status);
             }
-            free(command);
         }
     }
     return;
@@ -150,12 +141,12 @@ void eval(char *cmdline)
  */
 int builtin_cmd(char **argv) 
 {
+    if(strcmp(argv[0], "quit") == 0)
+    {
+        exit(0);
+    }
     return 0;     /* not a builtin command */
 }
-
-
-
-
 
 /***********************
  * Other helper routines
