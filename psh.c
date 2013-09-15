@@ -105,7 +105,7 @@ int main(int argc, char **argv)
 */
 void eval(char *cmdline) 
 {
-    if(strcmp(cmdline, "\n") != 0)
+    if(strcmp(cmdline, "\n") != 0) //ignore empty input
     {
         const int STDOUT = 1;
         char command[MAX_COMMAND_ARG_NUM][MAX_COMMAND_ARC_WORD_SIZE];
@@ -119,10 +119,12 @@ void eval(char *cmdline)
             pid_t child = fork();
             if(child == 0)
             {
-                execvp(command_ptr[0], command_ptr);
-                strcat (command_ptr[0],": command not found\n");
-                write(STDOUT, command_ptr[0], 20 + sizeof(command_ptr[0]));
-                exit(1);
+                if(execvp(command_ptr[0], command_ptr) < 0)
+                {
+                    strcat (command_ptr[0],": command not found\n");
+                    write(STDOUT, command_ptr[0], 20 + sizeof(command_ptr[0]));
+                    exit(1);
+                }
             }
             else
             {

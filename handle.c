@@ -44,8 +44,8 @@ int main(int argc, char **argv)
   char buffer[17] = {0};
   sprintf(buffer, "%lld\n", pid);
   write(STDOUT, buffer, sizeof(buffer)) != sizeof(buffer);
-  signal(SIGINT, sigint_handler);
-  signal(SIGUSR1, sigusr1_handler);
+  Signal(SIGINT, sigint_handler);
+  Signal(SIGUSR1, sigusr1_handler);
 
   while(1)
   {
