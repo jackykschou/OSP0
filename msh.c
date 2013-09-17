@@ -141,7 +141,6 @@ void eval(char *cmdline)
             pid_t child = fork(); //start new process for the new job
             if(child == 0)
             {
-                //set the pid group
                 setpgid(0, 0);
 
                 //execute the job
@@ -209,52 +208,60 @@ int builtin_cmd(char **argv)
  */
 void do_bgfg(char **argv) 
 {
-    /*get the jid or pid*/
-    struct job_t *j;
-    long long int id;
-    if(argv[1][0] == '%')
+
+    if(argv[1] != NULL) //ignore empty input
     {
-        //remove the %
-        size_t len = strlen(argv[1]) - 1;
-        char *num;
-        num = strncpy(num, argv[1][1], strlen(argv[1]) - 1);
-        id = strtol(num, (char **)NULL, 10);
-        printf("hehe: %d\n", id);
-    }
-    else
-    {
-        id = strtol(argv[1], (char **)NULL, 10);
-    }
-    //conversion fail, invalid input
-    if(id == 0)
-    {
-        printf("msh: %s: %s: no such job\n", argv[0], argv[1]);
-        return;
-    }
-    j = getjobpid(jobs, (pid_t) id);
-    //if fails to get pid, tries to get jid
-    if(j == NULL)
-    {
-        j = getjobjid(jobs, (int) strtol(argv[1], (char **)NULL, 10));
-    }
-    //if fails to get jid too, it must be an invalid input
-    if(j == NULL)
-    {
-        printf("msh: %s: %s: no such job\n", argv[0], argv[1]);
-        return;
-    }
-    /*check if bg or fg*/
-    if(strcmp(argv[0], "bg") == 0)
-    {
-        //if bg, just sent the continue signal
-        kill(j->pid, SIGCONT);
-    }
-    else
-    {
-        //if fg, change the state of the job, send continue signal and wait for it to finish
-        j->state = FG;
-        kill(j->pid, SIGCONT);
-        waitfg(j->pid);
+        /*get the jid or pid*/
+        struct job_t *j;
+        long long int id;
+
+        //jid
+        if(argv[1][0] == '%')
+        {
+            //remove the %
+            size_t len = strlen(argv[1]) - 1;
+            char num[MAXARGS];
+            strncpy(num, argv[1] + 1, strlen(argv[1]));
+            id = strtol(num, (char **)NULL, 10);
+            if(id == 0L) //if fail to convert to number
+            {
+                printf("fg command requires PID or %%jobid argument\n");
+                return;
+            }
+            if((j = getjobpid(jobs, (int) id)) == NULL) //if there is no such jid
+            {
+                printf("%%%d: No such job\n", id);
+                return;
+            }
+        }
+        else
+        {
+            id = strtol(argv[1], (char **)NULL, 10);
+            if(id == 0L)//if fail to convert to number
+            {
+                printf("fg command requires PID or %%jobid argument\n");
+                return;
+            }
+            if((j = getjobpid(jobs, (pid_t)id)) == NULL) //if there is no such pid
+            {
+                printf("(%lld): No such process\n", id);
+                return;
+            }
+        }
+        /*check if bg or fg*/
+        if(strcmp(argv[0], "bg") == 0)
+        {
+            //if bg, just sent the continue signal
+            j->state = BG;
+            kill(j->pid, SIGCONT);
+        }
+        else
+        {
+            //if fg, change the state of the job, send continue signal and wait for it to finish
+            j->state = FG;
+            kill(j->pid, SIGCONT);
+            waitfg(j->pid);
+        }
     }
     return;
 }
@@ -311,18 +318,19 @@ void sigchld_handler(int sig)
         {
             deletejob(jobs, pid);
         }
-        //exited because a signal was not caught
-        else if(WIFSIGNALED(status))
-        {
-            printf("Job [%d] (%lld) terminated by signal %d\n", j->jid, j->pid, WTERMSIG(status));
-            deletejob(jobs, pid);
-        }
         //stopped by signal
         else if(WIFSTOPPED(status))
         {
             printf("Job [%d] (%lld) stopped by signal %d\n", j->jid, j->pid, WSTOPSIG(status));
             j->state = ST;
         }
+        //exited because a signal was not caught
+        else if(WIFSIGNALED(status))
+        {
+            printf("Job [%d] (%lld) terminated by signal %d\n", j->jid, j->pid, WTERMSIG(status));
+            deletejob(jobs, pid);
+        }
+        
     }
     return;
 }
