@@ -136,7 +136,7 @@ void eval(char *cmdline)
         {
             sigset_t mask;
             sigemptyset(&mask);
-            sigaddset(&mask, SIGCHLD);
+            sigaddset(&mask, SIGCHLD | SIGINT | SIGTSTP);
             sigprocmask(SIG_BLOCK, &mask, NULL);
             pid_t child = fork(); //start new process for the new job
             if(child == 0)
@@ -144,7 +144,7 @@ void eval(char *cmdline)
                 setpgid(0, 0);
 
                 //execute the job
-                if(execvp(command_ptr[0], command_ptr) < 0) 
+                if(execve(command_ptr[0], command_ptr, NULL) < 0) 
                 {
                     sigprocmask(SIG_UNBLOCK, &mask, NULL); //unblock signal so that the job can be deleted now
                     strcat (command_ptr[0],": command not found\n");
